@@ -6,6 +6,9 @@
 #include "GameFramework/Actor.h"
 #include "TestActor.generated.h"
 
+
+DECLARE_MULTICAST_DELEGATE(FOnAsyncTaskFinished);
+
 UCLASS()
 class RENDERINGTECHNIQUES_API ATestActor : public AActor
 {
@@ -22,6 +25,9 @@ public:
 	
 	UFUNCTION(BlueprintCallable)
     void PaintVerticesAtLocation(FVector HitLocation, FColor TargetBaseColor, float PaintLerpProgress, float BrushSize);
+
+	UFUNCTION(BlueprintCallable)
+	void GetVertexColorsinArea(FVector HitLocation, float Radius);
     	
 	
 protected:
@@ -33,6 +39,15 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool bChangeAtRuntime = false;
+
+	TArray<int32> VerticesIds;
+
+	FOnAsyncTaskFinished OnAsyncTaskFinished;
+
+	UFUNCTION()
+	void OnAsyncTaskFinishedFunc();
+
+	bool bHasWaited = false;
 
 private:
 	UStaticMesh* DuplicateStaticMesh(UStaticMesh* OriginalMesh);
