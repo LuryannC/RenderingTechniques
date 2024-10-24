@@ -41,6 +41,8 @@ protected:
 	bool bChangeAtRuntime = false;
 
 	TArray<int32> VerticesIds;
+	
+	TArray<FColor> ExistingColors;
 
 	FOnAsyncTaskFinished OnAsyncTaskFinished;
 

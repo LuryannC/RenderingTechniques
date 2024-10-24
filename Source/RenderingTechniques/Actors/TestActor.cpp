@@ -184,64 +184,82 @@ void ATestActor::PaintVerticesAtLocation(FVector HitLocation, FColor TargetBaseC
 		}
 		FStaticMeshLODResources& LODModel = StaticMeshComponent->GetStaticMesh()->GetRenderData()->LODResources[0];
 		FStaticMeshComponentLODInfo* InstanceMeshLODInfo = &StaticMeshComponent->LODData[0];
-		
-		if (InstanceMeshLODInfo->OverrideVertexColors == nullptr)
+
+		InstanceMeshLODInfo->OverrideVertexColors = new FColorVertexBuffer;
+		if (ExistingColors.Num() > 0)
 		{
-			InstanceMeshLODInfo->OverrideVertexColors = new FColorVertexBuffer;
+			InstanceMeshLODInfo->OverrideVertexColors->InitFromColorArray(ExistingColors);
+		}
+		else
+		{
 			InstanceMeshLODInfo->OverrideVertexColors->InitFromSingleColor(FColor::White, LODModel.GetNumVertices());
 		}
 		
-		//BeginInitResource(InstanceMeshLODInfo->OverrideVertexColors);
+		// if (InstanceMeshLODInfo->OverrideVertexColors == nullptr)
+		// {
+		// 	InstanceMeshLODInfo->OverrideVertexColors = new FColorVertexBuffer;
+		// 	InstanceMeshLODInfo->OverrideVertexColors->InitFromSingleColor(FColor::White, LODModel.GetNumVertices());
+		// 	//BeginInitResource(InstanceMeshLODInfo->OverrideVertexColors);
+		// }
+		//
+		BeginInitResource(InstanceMeshLODInfo->OverrideVertexColors);
 		
 		FPositionVertexBuffer& PositionBuffer = LODModel.VertexBuffers.PositionVertexBuffer;
 		FColorVertexBuffer& ColorBuffer = *InstanceMeshLODInfo->OverrideVertexColors;
 		
-		TArray<FPaintedVertex> PaintedVertices = InstanceMeshLODInfo->PaintedVertices;
+		
+		ExistingColors.SetNumUninitialized(LODModel.GetNumVertices());
+
+		for (int32 VertexIndex = 0; VertexIndex < LODModel.GetNumVertices(); VertexIndex++)
+		{
+			ExistingColors[VertexIndex] = ColorBuffer.VertexColor(VertexIndex); // Retain the current color of each vertex
+		}
 				
 		DrawDebugSphere(GetWorld(), HitLocation, BrushSize, 32, FColor::Green, false, 5.0f);
 		
 		const int32 NumVertices = LODModel.GetNumVertices();
 		FTransform MeshTransform = StaticMeshComponent->GetComponentTransform();
 
-
-		Async(EAsyncExecution::TaskGraph, [this, &LODModel, &PositionBuffer, &ColorBuffer, NumVertices, InstanceMeshLODInfo, HitLocation, TargetBaseColor, PaintLerpProgress, BrushSize, MeshTransform]()
+		Async(EAsyncExecution::TaskGraph, [this, &LODModel, &PositionBuffer, &ColorBuffer, NumVertices, HitLocation, TargetBaseColor, PaintLerpProgress, BrushSize, MeshTransform]()
 		{
 			UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Async work Started"));
-			UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - HitLocation: %s, BrushSize: %f"), *HitLocation.ToString(), BrushSize);
-
+			
 			// Heavy computation: paint vertices in the background thread
 			VerticesIds.Empty();
 			for (int32 VertexIndex = 0; VertexIndex < NumVertices; VertexIndex++)
-			{							
+			{
 				FVector3f VertexPositionLocal = PositionBuffer.VertexPosition(VertexIndex);
 				FVector VertexPositionWorld = MeshTransform.TransformPosition(FVector(VertexPositionLocal));
-
-				FPaintedVertex NewVertex{};
-				NewVertex.Position = VertexPositionWorld;								
-				NewVertex.Color = FColor::White;
-
-				InstanceMeshLODInfo->PaintedVertices.Add(NewVertex);
 				
 				float Distance = FVector::Dist(HitLocation, VertexPositionWorld);
 
 				if (Distance <= BrushSize)
 				{
-					UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Vertex %d in bounds"), VertexIndex);
-					VerticesIds.AddUnique(VertexIndex);
-				}
-				else
-				{
-					//UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Vertex out of bounds"));
+					VerticesIds.Add(VertexIndex);
+
+					// Calculate the influence based on distance (falloff: linear)
+					float Influence = 1.0f - (Distance / BrushSize);
+
+					// Lerp from the previous color to the target base color based on the influence
+					FColor NewColor;
+					NewColor.R = 255;
+					NewColor.G = 0;
+					NewColor.B = 0;
+					
+					UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Painting Vertex %d with Color: R: %d G: %d B: %d"), VertexIndex, NewColor.R, NewColor.G, NewColor.B);
+
+					ExistingColors[VertexIndex] = NewColor;
+					ColorBuffer.VertexColor(VertexIndex) = NewColor;
+					UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Vertex %d new color after applied: R=%i G=%i B=%i"), VertexIndex, ColorBuffer.VertexColor(VertexIndex).R, ColorBuffer.VertexColor(VertexIndex).G, ColorBuffer.VertexColor(VertexIndex).B);
 				}
 			}
 			
 			// // Once painting is done, make sure the render state is updated on the game thread
 			AsyncTask(ENamedThreads::GameThread, [this]()
 			{
-				// Mark the mesh as needing a render update with the new colors
-				//StaticMeshComponent->MarkRenderStateDirty();
-				OnAsyncTaskFinished.Broadcast();
-			 	UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Async work finished"));
+				
+				OnAsyncTaskFinished.Broadcast();								
+				UE_LOG(LogTemp, Display, TEXT("ATestActor::PaintVerticesAtLocation - Async work finished"));
 			});
 		});
 	}
@@ -282,47 +300,6 @@ void ATestActor::GetVertexColorsinArea(FVector HitLocation, float Radius)
 
 void ATestActor::OnAsyncTaskFinishedFunc()
 {
-	if (!StaticMeshComponent) return;
-	
-	if (UStaticMesh* Mesh = StaticMeshComponent->GetStaticMesh())
-	{
-		if (StaticMeshComponent->LODData.IsEmpty())
-		{
-			StaticMeshComponent->SetLODDataCount(1, StaticMeshComponent->LODData.Num());
-		}
-		FStaticMeshComponentLODInfo* InstanceMeshLODInfo = &StaticMeshComponent->LODData[0];
-
-		FStaticMeshLODResources& LODModel = StaticMeshComponent->GetStaticMesh()->GetRenderData()->LODResources[0];
-		FPositionVertexBuffer& PositionBuffer = LODModel.VertexBuffers.PositionVertexBuffer;
-		FColorVertexBuffer& ColorBuffer = *InstanceMeshLODInfo->OverrideVertexColors;
-
-		TArray<FColor> NewColorArray;
-		
-		for(int32 i = 0; i < VerticesIds.Num(); ++i)
-		{
-			int32 CurrentIndex = VerticesIds[i];
-			if (InstanceMeshLODInfo->PaintedVertices.IsValidIndex(CurrentIndex))
-			{
-				InstanceMeshLODInfo->PaintedVertices[VerticesIds[i]].Color = FColor::Blue;
-			}
-			else
-			{
-				FPaintedVertex NewVertex{};
-
-				FTransform MeshTransform = StaticMeshComponent->GetComponentTransform();
-				FVector VertexPositionWorld = MeshTransform.TransformPosition(FVector(PositionBuffer.VertexPosition(CurrentIndex)));
-				NewVertex.Position = VertexPositionWorld;
-
-				NewVertex.Color = FColor::Blue;
-				
-				InstanceMeshLODInfo->PaintedVertices.Add(NewVertex);
-				NewColorArray.Add(NewVertex.Color);
-				//StaticMeshComponent->LODData[0].OverrideVertexColors->VertexColor(CurrentIndex) = FColor::Blue;
-			}
-		}
-
-		InstanceMeshLODInfo->OverrideVertexColors->InitFromColorArray(NewColorArray);
-		BeginInitResource(InstanceMeshLODInfo->OverrideVertexColors);
-		StaticMeshComponent->MarkRenderStateDirty();
-	}
+	StaticMeshComponent->LODData[0].OverrideVertexColors->InitFromColorArray(ExistingColors);
+	StaticMeshComponent->MarkRenderStateDirty();
 }
