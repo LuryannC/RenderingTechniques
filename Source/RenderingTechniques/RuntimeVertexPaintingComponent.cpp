@@ -3,26 +3,14 @@
 
 #include "RuntimeVertexPaintingComponent.h"
 
-URuntimeVertexPaintingComponent::URuntimeVertexPaintingComponent()
-{
-	PrimaryComponentTick.bCanEverTick = true;
-
-	// ...
-}
+#include "StaticMeshComponentLODInfo.h"
 
 void URuntimeVertexPaintingComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// ...
-	
-}
-
-void URuntimeVertexPaintingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	// ...
+	//InitializeVertexStructure();
+	//InitializeColourData();
 }
 
 UStaticMeshComponent* URuntimeVertexPaintingComponent::GetStaticMeshComponent()
@@ -47,4 +35,24 @@ USkeletalMeshComponent* URuntimeVertexPaintingComponent::GetSkeletalMeshComponen
 		return Cast<USkeletalMeshComponent>(OutSkeletalMeshes[0]);
 	}
 	return nullptr;
+}
+
+void URuntimeVertexPaintingComponent::InitializeVertexStructure()
+{	
+	VerticesStructure.VertexPaintingComponent = this;
+	VerticesStructure.StaticMeshComponent = GetStaticMeshComponent();
+
+	if (VerticesStructure.StaticMeshComponent && VerticesStructure.StaticMeshComponent->GetStaticMesh())
+	{
+		if (GetStaticMeshComponent()->LODData.IsEmpty())
+		{
+			GetStaticMeshComponent()->SetLODDataCount(1, GetStaticMeshComponent()->LODData.Num());
+		}
+		VerticesStructure.LODModel = &GetStaticMeshComponent()->GetStaticMesh()->GetRenderData()->LODResources[0];
+		VerticesStructure.LODInfo = &GetStaticMeshComponent()->LODData[0];
+	}
+}
+
+void URuntimeVertexPaintingComponent::InitializeColourData()
+{
 }

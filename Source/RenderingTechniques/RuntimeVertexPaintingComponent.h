@@ -7,28 +7,44 @@
 #include "Kismet/GameplayStatics.h"
 #include "RuntimeVertexPaintingComponent.generated.h"
 
+class URuntimeVertexPaintingComponent;
+USTRUCT(Blueprintable, BlueprintType)
+struct FRVPVerticesStructure
+{
+	GENERATED_BODY()
+public:
+
+	UPROPERTY()
+	TObjectPtr<URuntimeVertexPaintingComponent> VertexPaintingComponent;
+	
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> StaticMeshComponent;
+	
+	FStaticMeshLODResources* LODModel;
+	
+	FStaticMeshComponentLODInfo* LODInfo;
+
+};
+
 UCLASS( ClassGroup=(Custom), meta=(BlueprintSpawnableComponent) )
 class RENDERINGTECHNIQUES_API URuntimeVertexPaintingComponent : public UActorComponent
 {
 	GENERATED_BODY()
 
-public:	
-	URuntimeVertexPaintingComponent();
-
 protected:
 	virtual void BeginPlay() override;
 
 public:	
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
-
 	UStaticMeshComponent* GetStaticMeshComponent();
 	USkeletalMeshComponent* GetSkeletalMeshComponent();
 
+	void InitializeVertexStructure();
 	
-	TArray<FColor> ExistingColors;
+	UPROPERTY()
+	FRVPVerticesStructure VerticesStructure;
+	
+	TArray<FColor> Colors;
 private:
-			
-	TArray<int32> VerticesIds;
 
+	void InitializeColourData();
 };

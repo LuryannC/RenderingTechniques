@@ -8,23 +8,6 @@
 
 class URuntimeVertexPaintingComponent;
 
-USTRUCT()
-struct FRVPVertexStructure
-{
-	GENERATED_BODY()
-public:
-
-	UPROPERTY()
-	TObjectPtr<URuntimeVertexPaintingComponent> VertexPaintingComponent;
-	
-	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> StaticMeshComponent;
-	
-	FStaticMeshLODResources& LODModel;
-	
-	TObjectPtr<FStaticMeshComponentLODInfo> LODInfo;
-
-};
 
 /**
  * 
@@ -35,10 +18,10 @@ class RENDERINGTECHNIQUES_API UVertexPaintFuncLibrary : public UBlueprintFunctio
 	GENERATED_BODY()
 
 public:
+	//UFUNCTION(BlueprintCallable)
+	//static void PaintVerticesAtLocation(URuntimeVertexPaintingComponent* VertexPaintingComponent, FVector Location, float Radius, FColor ColorToPaint, bool bIgnoreVertexNormal);
+
 	UFUNCTION(BlueprintCallable)
-	static void PaintVerticesAtLocation(URuntimeVertexPaintingComponent* VertexPaintingComponent, FVector Location, float Radius, FColor ColorToPaint, bool bIgnoreVertexNormal);
-
-
+	static void PaintVerticesAtLocationV2(URuntimeVertexPaintingComponent* VertexPaintingComponent, FVector Location, float Radius, FColor ColorToPaint);
 private:
-	void InitializeTask();
 };
