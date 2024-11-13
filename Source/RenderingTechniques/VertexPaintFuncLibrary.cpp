@@ -140,7 +140,9 @@ void UVertexPaintFuncLibrary::PaintVerticesAtLocationV2(URuntimeVertexPaintingCo
 			{
 				FColor NewColor = ColorToPaint;
 				VertexPaintingComponent->Colors[VertexIndex] = NewColor;
-				VertexPaintingComponent->VerticesStructure.LODInfo->OverrideVertexColors->VertexColor(VertexIndex) = NewColor;					
+				VertexPaintingComponent->VerticesStructure.LODInfo->OverrideVertexColors->VertexColor(VertexIndex) = NewColor;
+
+				
 			}
 		}
 		AsyncTask(ENamedThreads::GameThread, [VertexPaintingComponent]()
