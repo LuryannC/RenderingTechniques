@@ -1,73 +1,83 @@
 #pragma once
 
+#include <functional>
+
 #include "CoreMinimal.h"
 #include "Containers/Queue.h"
 #include "Async/Async.h"
 
-USTRUCT()
 struct FPaintVertexTask
 {
-	GENERATED_BODY()
 public:
-	FPaintVertexTask();
-	
-	FPaintVertexTask(TFunction<void()> InTaskFunction, FString InTaskName)
-	: TaskFunction(InTaskFunction), TaskName(InTaskName) {}
+	TFunction<void()> TaskFunction;
+	FString TaskName;
+	ENamedThreads::Type ThreadType;
+	EAsyncExecution AsyncExecution;
 
-	void Execute()
+	FPaintVertexTask() = default;
+	FPaintVertexTask(const TFunction<void()>& InTaskFunction, const FString& InTaskName, ENamedThreads::Type InThreadType)
+	: TaskFunction(InTaskFunction), TaskName(InTaskName), ThreadType(InThreadType), AsyncExecution() {}
+
+	FPaintVertexTask(const TFunction<void()>& InTaskFunction, const FString& InTaskName, EAsyncExecution InExecutionType = EAsyncExecution::ThreadPool)
+	: TaskFunction(InTaskFunction), TaskName(InTaskName), ThreadType(), AsyncExecution(InExecutionType) {}
+
+	bool IsTaskValid() const
 	{
-		if (TaskFunction)
+		return TaskFunction != nullptr && !TaskName.IsEmpty();
+	}
+
+	void ExecuteTask() const
+	{
+		if (IsTaskValid())
 		{
 			TaskFunction();
 		}
 	}
-
-	FString GetTaskName() const { return TaskName; }
-	
-private:
-	TFunction<void()> TaskFunction;
-	FString TaskName;
 };
 
-USTRUCT()
 struct FRuntimePaintTaskQueue
 {
-public:
+	TArray<FPaintVertexTask> Tasks;
+	TQueue<FPaintVertexTask, EQueueMode::Spsc> TaskQueue;
 
-	void AddTask(TFunction<void()> TaskFunction, const FString& TaskName)
+	void RegisterTask(const TFunction<void()>& InTaskFunction, const FString& InTaskName, ENamedThreads::Type InThreadType)
 	{
-		TaskQueue.Enqueue(FPaintVertexTask(TaskFunction, TaskName));
-		TryExecuteNextTask();
+		const FPaintVertexTask Task(InTaskFunction, InTaskName, InThreadType);
+		Tasks.Add(Task);
+		TaskQueue.Enqueue(Task);
+		UE_LOG(LogTemp, Log, TEXT("Task registered: %s"), *InTaskName);
+	}
+	
+	void RegisterTask(const TFunction<void()>& InTaskFunction, const FString& InTaskName, EAsyncExecution InAsyncExecution)
+	{
+		const FPaintVertexTask Task(InTaskFunction, InTaskName, InAsyncExecution);
+		Tasks.Add(Task);
+		TaskQueue.Enqueue(Task);
+		UE_LOG(LogTemp, Log, TEXT("Task registered: %s"), *InTaskName);
 	}
 
-private:
-	TQueue<FPaintVertexTask> TaskQueue;
-	bool bIsTaskRunning = false;
-
-	void TryExecuteNextTask()
+	void RunTasks()
 	{
-		if (bIsTaskRunning || TaskQueue.IsEmpty())
-		{
-			return;
-		}
-
+		if(TaskQueue.IsEmpty()) return;
+		
 		FPaintVertexTask NextTask;
 		if (TaskQueue.Dequeue(NextTask))
 		{
-			bIsTaskRunning = true;
-			NotifyTaskStart(NextTask.GetTaskName());
-
-			AsyncTask(ENamedThreads::AnyBackgroundThreadNormalTask, [this, &NextTask]()
+			if (NextTask.ThreadType)
 			{
-				NextTask.Execute();
-				NotifyTaskFinish(NextTask.GetTaskName());
-
-				AsyncTask(ENamedThreads::GameThread, [this]()
+				AsyncTask(NextTask.ThreadType, [this, NextTask]()
 				{
-					bIsTaskRunning = false;
-					TryExecuteNextTask();
+					NextTask.ExecuteTask();
 				});
-			});
+			}
+			else
+			{
+				Async(NextTask.AsyncExecution, [this, NextTask]()
+				{
+					NextTask.ExecuteTask();
+				});
+			}
+			RunTasks();
 		}
 	}
 

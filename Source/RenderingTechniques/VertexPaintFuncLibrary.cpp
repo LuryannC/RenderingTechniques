@@ -3,6 +3,7 @@
 
 #include "VertexPaintFuncLibrary.h"
 
+#include "RuntimePaintTaskQueue.h"
 #include "RuntimeVertexPaintingComponent.h"
 #include "StaticMeshComponentLODInfo.h"
 
@@ -123,17 +124,17 @@ void UVertexPaintFuncLibrary::PaintVerticesAtLocationV2(URuntimeVertexPaintingCo
 		VertexPaintingComponent->Colors[VertexIndex] = VertexPaintingComponent->VerticesStructure.LODInfo->OverrideVertexColors->VertexColor(VertexIndex);
 	}
 	
-	// Execute Task
-	Async(EAsyncExecution::TaskGraph, [VertexPaintingComponent, Location, Radius, ColorToPaint]()
+	FRuntimePaintTaskQueue PaintTaskQueue{};
+	PaintTaskQueue.RegisterTask([VertexPaintingComponent, Location, Radius, ColorToPaint]
 	{
 		const int32 NumVertices = VertexPaintingComponent->VerticesStructure.LODModel->GetNumVertices();
 		FTransform MeshTransform = VertexPaintingComponent->GetStaticMeshComponent()->GetComponentTransform();
-
+	
 		for (int32 VertexIndex = 0; VertexIndex < NumVertices; VertexIndex++)
 		{
 			FVector3f VertexPositionLocal = VertexPaintingComponent->VerticesStructure.LODModel->VertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
 			FVector VertexPositionWorld = MeshTransform.TransformPosition(FVector(VertexPositionLocal));
-
+	
 			float Distance = FVector::Dist(Location, VertexPositionWorld);
 			
 			if (Distance <= Radius)
@@ -141,14 +142,45 @@ void UVertexPaintFuncLibrary::PaintVerticesAtLocationV2(URuntimeVertexPaintingCo
 				FColor NewColor = ColorToPaint;
 				VertexPaintingComponent->Colors[VertexIndex] = NewColor;
 				VertexPaintingComponent->VerticesStructure.LODInfo->OverrideVertexColors->VertexColor(VertexIndex) = NewColor;
-
-				
 			}
 		}
-		AsyncTask(ENamedThreads::GameThread, [VertexPaintingComponent]()
-		{				
-			VertexPaintingComponent->GetStaticMeshComponent()->LODData[0].OverrideVertexColors->InitFromColorArray(VertexPaintingComponent->Colors);
-			VertexPaintingComponent->GetStaticMeshComponent()->MarkRenderStateDirty();							
-		});
-	});
+		UE_LOG(LogTemp, Log, TEXT("Register new colours called"));
+	}, TEXT("Register new colours"), EAsyncExecution::TaskGraph);
+
+	PaintTaskQueue.RegisterTask([VertexPaintingComponent]
+	{
+		VertexPaintingComponent->GetStaticMeshComponent()->LODData[0].OverrideVertexColors->InitFromColorArray(VertexPaintingComponent->Colors);
+		VertexPaintingComponent->GetStaticMeshComponent()->MarkRenderStateDirty();
+		UE_LOG(LogTemp, Log, TEXT("Paint new colours called"));
+	}, TEXT("Paint new colours"), ENamedThreads::GameThread);
+	
+	PaintTaskQueue.RunTasks();
+
+	// Trying to better solve this
+	// Execute Task
+	//Async(EAsyncExecution::TaskGraph, [VertexPaintingComponent, Location, Radius, ColorToPaint]()
+	//{
+	//	const int32 NumVertices = VertexPaintingComponent->VerticesStructure.LODModel->GetNumVertices();
+	//	FTransform MeshTransform = VertexPaintingComponent->GetStaticMeshComponent()->GetComponentTransform();
+	//
+	//	for (int32 VertexIndex = 0; VertexIndex < NumVertices; VertexIndex++)
+	//	{
+	//		FVector3f VertexPositionLocal = VertexPaintingComponent->VerticesStructure.LODModel->VertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
+	//		FVector VertexPositionWorld = MeshTransform.TransformPosition(FVector(VertexPositionLocal));
+	//
+	//		float Distance = FVector::Dist(Location, VertexPositionWorld);
+	//		
+	//		if (Distance <= Radius)
+	//		{
+	//			FColor NewColor = ColorToPaint;
+	//			VertexPaintingComponent->Colors[VertexIndex] = NewColor;
+	//			VertexPaintingComponent->VerticesStructure.LODInfo->OverrideVertexColors->VertexColor(VertexIndex) = NewColor;
+	//		}
+	//	}
+	//	AsyncTask(ENamedThreads::GameThread, [VertexPaintingComponent]()
+	//	{				
+	//		VertexPaintingComponent->GetStaticMeshComponent()->LODData[0].OverrideVertexColors->InitFromColorArray(VertexPaintingComponent->Colors);
+	//		VertexPaintingComponent->GetStaticMeshComponent()->MarkRenderStateDirty();							
+	//	});
+	//});
 }

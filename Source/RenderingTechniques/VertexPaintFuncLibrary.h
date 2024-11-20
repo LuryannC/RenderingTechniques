@@ -22,5 +22,6 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	static void PaintVerticesAtLocationV2(URuntimeVertexPaintingComponent* VertexPaintingComponent, FVector Location, float Radius, FColor ColorToPaint);
+
 private:
 };
