@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 
 #include "CoreMinimal.h"
@@ -77,6 +78,7 @@ struct FRuntimePaintTaskQueue
 					NextTask.ExecuteTask();
 				});
 			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 			RunTasks();
 		}
 	}
