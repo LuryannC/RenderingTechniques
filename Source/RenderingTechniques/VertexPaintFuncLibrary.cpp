@@ -123,6 +123,8 @@ void UVertexPaintFuncLibrary::PaintVerticesAtLocationV2(URuntimeVertexPaintingCo
 	{
 		VertexPaintingComponent->Colors[VertexIndex] = VertexPaintingComponent->VerticesStructure.LODInfo->OverrideVertexColors->VertexColor(VertexIndex);
 	}
+
+	DrawDebugSphere(VertexPaintingComponent->GetWorld(), Location, Radius, 32, FColor::Green, false, 3.0f);
 	
 	FRuntimePaintTaskQueue PaintTaskQueue{};
 	PaintTaskQueue.RegisterTask([VertexPaintingComponent, Location, Radius, ColorToPaint]
@@ -134,6 +136,7 @@ void UVertexPaintFuncLibrary::PaintVerticesAtLocationV2(URuntimeVertexPaintingCo
 		{
 			FVector3f VertexPositionLocal = VertexPaintingComponent->VerticesStructure.LODModel->VertexBuffers.PositionVertexBuffer.VertexPosition(VertexIndex);
 			FVector VertexPositionWorld = MeshTransform.TransformPosition(FVector(VertexPositionLocal));
+			
 	
 			float Distance = FVector::Dist(Location, VertexPositionWorld);
 			

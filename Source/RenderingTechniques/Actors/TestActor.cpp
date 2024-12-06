@@ -38,7 +38,7 @@ void ATestActor::PaintSMVertices()
 		//Empty the painted vertices and assign a new color vertex buffer which will contain the new colors for each vertex
 		LODInfo->PaintedVertices.Empty();
 		LODInfo->OverrideVertexColors = new FColorVertexBuffer();
-
+		
 		//We're going to use the LODResources to get the total number of vertices that the provided mesh has
 		FStaticMeshLODResources& LODResources = Mesh->GetRenderData()->LODResources[0];
 
@@ -53,11 +53,8 @@ void ATestActor::PaintSMVertices()
 			//Generate a random color for the current vertex
 			RandomColorArray.Add(FColor::MakeRandomColor());
 		}
-
-		//Initialize the new vertex colros with the array we created above
+		
 		LODInfo->OverrideVertexColors->InitFromColorArray(RandomColorArray);
-
-		//Initialize resource and mark render state of object as dirty in order for the engine to re-render it
 		BeginInitResource(LODInfo->OverrideVertexColors);
 		StaticMeshComponent->MarkRenderStateDirty();
 	}	
